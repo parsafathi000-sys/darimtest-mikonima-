@@ -14,7 +14,7 @@ RUN curl -L https://github.com/mhsanaei/3x-ui/releases/download/v3.4.2/x-ui-linu
 RUN mkdir -p /etc/x-ui /var/log/x-ui /relay
 
 COPY requirements.txt /relay/requirements.txt
-RUN pip3 install --no-cache-dir -r /relay/requirements.txt
+RUN pip3 install --no-cache-dir --break-system-packages -r /relay/requirements.txt
 
 COPY relay_vless.py /relay/relay_vless.py
 COPY xhttp_relay.py /relay/xhttp_relay.py
