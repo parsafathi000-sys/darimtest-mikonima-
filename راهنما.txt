@@ -1,0 +1,145 @@
+راهنمای کامل راه اندازی 3x-ui + XHTTP Hybrid
+===============================================
+
+===================
+قسمت ۱: دیپلوی
+===================
+
+مرحله ۱ - آپلود به GitHub:
+  ۱. برو github.com/new
+  ۲. یه ریپازیتوری جدید بساز (مثلاً hybrid-xui)
+  ۳. Public باشه یا Private فرقی نداره
+  ۴. فایل‌های پروژه رو آپلود کن:
+     - Dockerfile
+     - nginx.conf.template
+     - start.sh
+     - xhttp_relay.py
+     - relay_vless.py
+     - requirements.txt
+     - README.md
+
+   راه دوم خط فرمان:
+     cd Desktop\3x-ui-X4G-Hybrid
+     git init
+     git add .
+     git commit -m "first"
+     git remote add origin https://github.com/UserName/hybrid-xui.git
+     git branch -M main
+     git push -u origin main
+
+مرحله ۲ - دیپلوی روی Railway:
+  ۱. برو railway.app
+  ۲. New Project → Deploy from GitHub repo
+  ۳. ریپازیتوری hybrid-xui رو انتخاب کن
+  ۴. ۲-۳ دقیقه صبر کن تا بیلد بشه
+  ۵. برو Settings → Networking → Generate Domain
+  ۶. یه دامنه مثل hybrid-xui.up.railway.app می‌ده
+  ۷. کافیه، نیازی به تنظیم پورت نیست
+
+===================
+قسمت ۲: پنل سنایی
+===================
+
+ورود به پنل:
+  آدرس: https://hybrid-xui.up.railway.app/panel/
+  کاربر: admin
+  رمز: admin
+  (بعد از ورود فوراً رمز رو عوض کن)
+
+===================
+قسمت ۳: ساخت WebSocket
+===================
+
+تو پنل سنایی:
+  + رو بزن
+    - Remark: ws1
+    - Port: 443
+    - Protocol: VLESS
+    - Listen: 0.0.0.0
+    - Network: ws
+    - Security: none
+    - Path: /ws1
+  ذخیره کن
+
+کانفیگ کلاینت:
+  vless://UUID@hybrid-xui.up.railway.app:443?encryption=none&security=tls&type=ws&host=hybrid-xui.up.railway.app&path=%2Fws1#MyWS
+
+(UUID رو از پنل کپی کن)
+
+===================
+قسمت ۴: ساخت XHTTP
+===================
+
+XHTTP از X4G relay کار می‌کنه (پورت ۹۹۹۹). تو پنل سنایی تنظیم نمیشه -
+کانفیگ رو دستی می‌سازی.
+
+۱. یه UUID درست کن (می‌تونی از UUID که 3x-ui ساخت استفاده کنی)
+
+۲. کانفیگ stream-up:
+   vless://UUID@hybrid-xui.up.railway.app:443?encryption=none&security=tls&type=xhttp&mode=stream-up&host=hybrid-xui.up.railway.app&path=%2Fxhttp-siz10%2Fstream-up%2FUUID%2Fs123&sni=hybrid-xui.up.railway.app&fp=chrome#XHTTP-Stream
+
+۳. کانفیگ packet-up:
+   vless://UUID@hybrid-xui.up.railway.app:443?encryption=none&security=tls&type=xhttp&mode=packet-up&host=hybrid-xui.up.railway.app&path=%2Fxhttp-siz10%2Fpacket-up%2FUUID%2Fs123&sni=hybrid-xui.up.railway.app&fp=chrome#XHTTP-Packet
+
+انواع XHTTP که کار می‌کنه و نمی‌کنه:
+
+  +------------------+-----------+--------------------------------------+
+  | نوع              | کار می‌کنه| دلیل                                |
+  +------------------+-----------+--------------------------------------+
+  | XHTTP + TLS      | ✅ بله    | TLS رو Railway میده، relay کار      |
+  | (stream-up)      |           | می‌کنه                              |
+  +------------------+-----------+--------------------------------------+
+  | XHTTP + TLS      | ✅ بله    | مثل stream-up فقط پکت‌بندی فرق داره |
+  | (packet-up)      |           |                                     |
+  +------------------+-----------+--------------------------------------+
+  | XHTTP + WS + TLS | ✅ بله    | X4G از HTTP streaming استفاده       |
+  | (همون stream-up) |           | می‌کنه نه WebSocket واقعی          |
+  +------------------+-----------+--------------------------------------+
+  | XHTTP + Reality  | ❌ نه     | Reality نیاز به TCP خام داره،       |
+  |                  |           | Railway TLS رو قطع می‌کنه           |
+  +------------------+-----------+--------------------------------------+
+  | XHTTP (خالص)     | ❌ نه     | xray-core نیاز به HTTP/2 (h2c)      |
+  | از پنل 3x-ui     |           | داره. nginx پشتیبانی نمی‌کنه        |
+  +------------------+-----------+--------------------------------------+
+
+نکته: X4G relay محدودیت نداره - هر UUIDای قبول می‌کنه
+
+===================
+قسمت ۵: نکات فنی
+===================
+
+معماری داخل کانتینر:
+  +----------------------------------------------------+
+  | Railway Domain (HTTPS)                             |
+  |         |                                           |
+  |         ▼                                          |
+  |    nginx:$PORT                                      |
+  |         |                                           |
+  |    /panel/  ──→ x-ui:2053 (پنل سنایی)              |
+  |    /sub/    ──→ x-ui:2096 (ساب)                    |
+  |    /xhttp-siz10/ ──→ X4G relay:9999 (XHTTP)        |
+  |    /*        ──→ xray:8080 (WebSocket)             |
+  +----------------------------------------------------+
+
+اگر پنل سنایی inbound رو بسازی با port 443:
+  8080 → socat → 443 → xray گوش می‌ده
+
+XHTTP relay مستقیم به 9999 وصل میشه (نیاز به socat نداره)
+
+===================
+عیب‌یابی
+===================
+
+مشکل: نمیتونم به پنل وصل بشم
+  راه: Railway log رو چک کن. صبر کن بیلد تموم بشه.
+
+مشکل: WebSocket کار نمی‌کنه
+  راه: تو پنل چک کن inbound درست ساخته شده. port = 443 یا 8080.
+
+مشکل: XHTTP کار نمی‌کنه
+  راه: چک کن کانفیگ درسته. از mode=stream-up استفاده کن.
+  Railway log رو ببین اگه relay خطا میده.
+  اول GET رو بزن بعد POST.
+
+مشکل: هر دو inbound WebSocket قطع میشن
+  راه: همه inboundها رو با یه پورت بساز (مثلاً ۴۴۳) و path متفاوت.
